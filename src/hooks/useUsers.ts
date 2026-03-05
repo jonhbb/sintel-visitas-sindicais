@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth, Profile } from "./useAuth";
 import { toast } from "@/hooks/use-toast";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
 export function useUsers() {
   const { isAdmin } = useAuth();
 
@@ -30,21 +33,48 @@ export function useCreateUser() {
       fullName: string;
       role: string;
     }) => {
-      const { data, error } = await supabase.rpc("admin_create_user", {
-        user_email: params.email,
-        user_password: params.password,
-        user_full_name: params.fullName,
-        user_role: params.role,
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+        },
+        body: JSON.stringify({
+          email: params.email,
+          password: params.password,
+          data: { full_name: params.fullName },
+        }),
       });
-      if (error) throw error;
-      return data;
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.msg || result.error_description || "Erro ao criar usuário");
+      }
+
+      if (!result.id) {
+        throw new Error("Erro inesperado ao criar usuário");
+      }
+
+      // Wait briefly for the trigger to create the profile
+      await new Promise((r) => setTimeout(r, 1000));
+
+      // Update the profile with the desired role
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ role: params.role, full_name: params.fullName })
+        .eq("id", result.id);
+
+      if (updateError) throw updateError;
+
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       toast({ title: "Usuário criado com sucesso!" });
     },
     onError: (error) => {
-      const msg = error.message.includes("já está cadastrado")
+      const msg = error.message.includes("already been registered")
         ? "Este e-mail já está cadastrado."
         : error.message;
       toast({ title: "Erro ao criar usuário", description: msg, variant: "destructive" });
