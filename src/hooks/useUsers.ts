@@ -74,7 +74,8 @@ export function useCreateUser() {
       toast({ title: "Usuário criado com sucesso!" });
     },
     onError: (error) => {
-      const msg = error.message.includes("already been registered")
+      const msg = error.message.toLowerCase().includes("already registered") ||
+        error.message.toLowerCase().includes("already been registered")
         ? "Este e-mail já está cadastrado."
         : error.message;
       toast({ title: "Erro ao criar usuário", description: msg, variant: "destructive" });
