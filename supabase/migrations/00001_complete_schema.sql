@@ -83,7 +83,10 @@ BEGIN
       WHEN (SELECT count(*) FROM public.profiles) = 0 THEN 'admin'
       ELSE 'user'
     END
-  );
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = COALESCE(NULLIF(EXCLUDED.full_name, ''), public.profiles.full_name);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -145,62 +148,8 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================
--- 6. FUNÇÕES ADMIN (criar e excluir usuários)
+-- 6. FUNÇÕES ADMIN (excluir usuários)
 -- ============================================
-
-CREATE OR REPLACE FUNCTION public.admin_create_user(
-  user_email TEXT,
-  user_password TEXT,
-  user_full_name TEXT DEFAULT '',
-  user_role TEXT DEFAULT 'user'
-)
-RETURNS json
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, extensions
-AS $$
-DECLARE
-  new_user_id UUID;
-  encrypted_pw TEXT;
-BEGIN
-  IF NOT public.is_admin() THEN
-    RAISE EXCEPTION 'Apenas administradores podem criar usuários';
-  END IF;
-
-  IF EXISTS (SELECT 1 FROM auth.users WHERE email = user_email) THEN
-    RAISE EXCEPTION 'Este e-mail já está cadastrado';
-  END IF;
-
-  new_user_id := gen_random_uuid();
-  encrypted_pw := crypt(user_password, gen_salt('bf'));
-
-  INSERT INTO auth.users (
-    instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, created_at, updated_at,
-    raw_app_meta_data, raw_user_meta_data,
-    confirmation_token, recovery_token, email_change_token_new
-  ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
-    new_user_id, 'authenticated', 'authenticated',
-    user_email, encrypted_pw,
-    now(), now(), now(),
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    jsonb_build_object('full_name', user_full_name),
-    '', '', ''
-  );
-
-  INSERT INTO auth.identities (
-    id, user_id, identity_data, provider, provider_id,
-    last_sign_in_at, created_at, updated_at
-  ) VALUES (
-    gen_random_uuid(), new_user_id,
-    jsonb_build_object('sub', new_user_id::text, 'email', user_email, 'email_verified', true),
-    'email', new_user_id::text, now(), now(), now()
-  );
-
-  RETURN json_build_object('id', new_user_id, 'email', user_email);
-END;
-$$;
 
 CREATE OR REPLACE FUNCTION public.admin_delete_user(target_user_id UUID)
 RETURNS void

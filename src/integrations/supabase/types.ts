@@ -96,15 +96,6 @@ export type Database = {
         Args: Record<string, never>
         Returns: boolean
       }
-      admin_create_user: {
-        Args: {
-          user_email: string
-          user_password: string
-          user_full_name?: string
-          user_role?: string
-        }
-        Returns: Json
-      }
       admin_delete_user: {
         Args: {
           target_user_id: string
