@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { BottomNav } from "@/components/BottomNav";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               <LogOut className="h-4 w-4" />
             </Button>
           </header>
+          <OfflineBanner />
           <main className="flex-1 p-4 md:p-6 overflow-auto pb-24 md:pb-6">
             {children}
           </main>

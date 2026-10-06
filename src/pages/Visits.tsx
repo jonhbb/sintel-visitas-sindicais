@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { PlusCircle, Pencil, Trash2, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, Pencil, Trash2, AlertTriangle, ChevronLeft, ChevronRight, Navigation, Camera } from "lucide-react";
+import { openMaps } from "@/lib/location";
 import { useNavigate } from "react-router-dom";
 import { format, parseISO, isBefore, startOfDay } from "date-fns";
 
@@ -81,7 +82,7 @@ export default function Visits() {
     </DropdownMenu>
   );
 
-  const DeleteButton = ({ id }: { id: string }) => (
+  const DeleteButton = ({ id, photos }: { id: string; photos: string[] }) => (
     <AlertDialog>
       <AlertDialogTrigger asChild>
         <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive">
@@ -95,7 +96,7 @@ export default function Visits() {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction onClick={() => deleteVisit.mutate(id)}>Excluir</AlertDialogAction>
+          <AlertDialogAction onClick={() => deleteVisit.mutate({ id, photos })}>Excluir</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -195,8 +196,9 @@ export default function Visits() {
                     <TableCell className="hidden lg:table-cell max-w-[150px] truncate text-muted-foreground text-sm">{v.notes || "—"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openMaps(v)} aria-label="Abrir no mapa"><Navigation className="h-4 w-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => navigate(`/nova-visita?id=${v.id}`)}><Pencil className="h-4 w-4" /></Button>
-                        <DeleteButton id={v.id} />
+                        <DeleteButton id={v.id} photos={v.photos ?? []} />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -229,13 +231,19 @@ export default function Visits() {
                       {format(parseISO(v.visit_date), "dd/MM/yyyy")} às {v.visit_time.slice(0, 5)}
                     </span>
                     <span>{v.visit_type}</span>
+                    {(v.photos?.length ?? 0) > 0 && (
+                      <span className="flex items-center gap-1"><Camera className="h-3 w-3" />{v.photos.length}</span>
+                    )}
                   </div>
                   {v.notes && <p className="text-sm text-muted-foreground line-clamp-2">{v.notes}</p>}
                   <div className="flex justify-end gap-1 pt-1 border-t">
+                    <Button variant="ghost" size="sm" onClick={() => openMaps(v)}>
+                      <Navigation className="h-3.5 w-3.5 mr-1" /> Mapa
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => navigate(`/nova-visita?id=${v.id}`)}>
                       <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                     </Button>
-                    <DeleteButton id={v.id} />
+                    <DeleteButton id={v.id} photos={v.photos ?? []} />
                   </div>
                 </CardContent>
               </Card>

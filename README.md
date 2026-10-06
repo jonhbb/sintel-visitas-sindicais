@@ -73,3 +73,5 @@ npm run android:open    # abre no Android Studio (Run ▶ ou Build > Build APK)
 O deploy web (GitHub Pages) continua igual: `npm run build` sem `VITE_BASE`.
 
 **Supabase:** desative "Allow new users to sign up" (Authentication → Sign In / Providers) e crie as duas contas em Authentication → Users → Add user.
+
+**Funções de campo:** exigem rodar `supabase/migrations/00002_visit_field_features.sql` no SQL Editor do Supabase (colunas de GPS/fotos e bucket privado `visit-photos`).
