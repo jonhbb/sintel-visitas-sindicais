@@ -62,3 +62,16 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sua_chave_anon_aqui
 ## Deploy
 
 O frontend é uma SPA estática. Após `npm run build`, a pasta `dist/` pode ser hospedada em qualquer serviço (Vercel, Netlify, etc.). Configure as variáveis de ambiente no serviço de hosting.
+
+## App Android (Capacitor)
+
+```sh
+npm run build:android   # build com base relativa + cap sync
+npm run android:open    # abre no Android Studio (Run ▶ ou Build > Build APK)
+```
+
+O deploy web (GitHub Pages) continua igual: `npm run build` sem `VITE_BASE`.
+
+**Supabase:** desative "Allow new users to sign up" (Authentication → Sign In / Providers) e crie as duas contas em Authentication → Users → Add user.
+
+**Funções de campo:** exigem rodar `supabase/migrations/00002_visit_field_features.sql` no SQL Editor do Supabase (colunas de GPS/fotos e bucket privado `visit-photos`).

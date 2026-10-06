@@ -48,6 +48,9 @@ export type Database = {
           company_name: string
           created_at: string
           id: string
+          latitude: number | null
+          longitude: number | null
+          photos: string[]
           notes: string | null
           result: string | null
           status: string
@@ -62,6 +65,9 @@ export type Database = {
           company_name: string
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
+          photos?: string[]
           notes?: string | null
           result?: string | null
           status?: string
@@ -76,6 +82,9 @@ export type Database = {
           company_name?: string
           created_at?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
+          photos?: string[]
           notes?: string | null
           result?: string | null
           status?: string

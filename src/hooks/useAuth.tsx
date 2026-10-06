@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient, persister } from "@/lib/queryClient";
 
 export type Profile = {
   id: string;
@@ -76,6 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setProfile(null);
     await supabase.auth.signOut();
+    // Duas contas podem usar o mesmo aparelho: não deixar os dados da anterior em cache
+    queryClient.clear();
+    await persister.removeClient();
   };
 
   const isAdmin = profile?.role === "admin";

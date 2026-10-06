@@ -1,5 +1,6 @@
-import { LayoutDashboard, ClipboardList, PlusCircle, BarChart3, LogOut, Users } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
+import { navItems } from "@/components/BottomNav";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Sidebar,
@@ -14,23 +15,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const menuItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Visitas", url: "/visitas", icon: ClipboardList },
-  { title: "Nova Visita", url: "/nova-visita", icon: PlusCircle },
-  { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-];
-
-const adminItems = [
-  { title: "Usuários", url: "/usuarios", icon: Users },
-];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
-  const { signOut, user, profile, isAdmin } = useAuth();
-
-  const allItems = isAdmin ? [...menuItems, ...adminItems] : menuItems;
+  const { signOut, user, profile } = useAuth();
 
   return (
     <Sidebar collapsible="icon">
@@ -48,7 +36,7 @@ export function AppSidebar() {
 
           <SidebarGroupContent>
             <SidebarMenu>
-              {allItems.map((item) => (
+              {navItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink

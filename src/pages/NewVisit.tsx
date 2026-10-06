@@ -8,7 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Building2 } from "lucide-react";
+import { Loader2, Building2, MapPin, Camera, X, Navigation } from "lucide-react";
+import { onlineManager } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/hooks/use-toast";
+import { capturePhoto, getSignedUrls, PendingPhoto } from "@/lib/photos";
+import { getCurrentCoords, reverseGeocode, openMaps } from "@/lib/location";
 import { format } from "date-fns";
 
 const visitTypes = ["Fiscalização", "Reunião", "Denúncia", "Visita institucional", "Outro"];
@@ -24,6 +29,16 @@ export default function NewVisit() {
 
   const createVisit = useCreateVisit();
   const updateVisit = useUpdateVisit();
+  const { user } = useAuth();
+  // id fixo da visita: necessário para nomear as fotos antes de salvar
+  const newVisitId = useRef(crypto.randomUUID());
+  const visitId = editId ?? newVisitId.current;
+
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [savedPhotos, setSavedPhotos] = useState<string[]>([]);
+  const [newPhotos, setNewPhotos] = useState<PendingPhoto[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
 
   const now = new Date();
   const [form, setForm] = useState({
@@ -70,8 +85,41 @@ export default function NewVisit() {
         notes: editVisit.notes || "",
         result: editVisit.result || "",
       });
+      setCoords(
+        editVisit.latitude != null && editVisit.longitude != null
+          ? { latitude: editVisit.latitude, longitude: editVisit.longitude }
+          : null,
+      );
+      setSavedPhotos(editVisit.photos ?? []);
     }
   }, [editVisit]);
+
+  useEffect(() => {
+    if (savedPhotos.length && onlineManager.isOnline()) getSignedUrls(savedPhotos).then(setSignedUrls);
+  }, [savedPhotos]);
+
+  const handleLocate = async () => {
+    setLocating(true);
+    try {
+      const c = await getCurrentCoords();
+      setCoords(c);
+      if (onlineManager.isOnline() && !form.company_address.trim()) {
+        const address = await reverseGeocode(c);
+        if (address) setForm((f) => ({ ...f, company_address: address }));
+      }
+      toast({ title: "Localização registrada" });
+    } catch (err) {
+      toast({ title: "Não foi possível obter a localização", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleAddPhoto = async () => {
+    if (!user) return;
+    const photo = await capturePhoto(user.id, visitId);
+    if (photo) setNewPhotos((p) => [...p, photo]);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -107,10 +155,23 @@ export default function NewVisit() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      ...form,
+      latitude: coords?.latitude ?? null,
+      longitude: coords?.longitude ?? null,
+      photos: [...savedPhotos, ...newPhotos.map((p) => p.path)],
+      newPhotos,
+    };
+    // Offline a mutação fica na fila, então não dá para esperar o sucesso para sair da tela
+    const options = onlineManager.isOnline() ? { onSuccess: () => navigate("/visitas") } : undefined;
     if (editId) {
-      updateVisit.mutate({ id: editId, ...form }, { onSuccess: () => navigate("/visitas") });
+      updateVisit.mutate({ id: editId, ...payload }, options);
     } else {
-      createVisit.mutate(form, { onSuccess: () => navigate("/visitas") });
+      createVisit.mutate({ id: visitId, ...payload }, options);
+    }
+    if (!options) {
+      toast({ title: "Sem internet", description: "A visita foi salva no aparelho e será enviada quando voltar a conexão." });
+      navigate("/visitas");
     }
   };
 
@@ -178,6 +239,28 @@ export default function NewVisit() {
                 <Input id="company_address" value={form.company_address} onChange={(e) => update("company_address", e.target.value)} placeholder="Rua, número, bairro, cidade..." required />
               </div>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={handleLocate} disabled={locating}>
+                  {locating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
+                  {coords ? "Atualizar localização" : "Usar minha localização"}
+                </Button>
+                {(coords || form.company_address.trim()) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMaps({ ...coords, company_address: form.company_address })}
+                  >
+                    <Navigation className="mr-2 h-4 w-4" /> Abrir no mapa
+                  </Button>
+                )}
+                {coords && (
+                  <span className="text-xs text-muted-foreground">
+                    {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+                  </span>
+                )}
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Tipo de Visita</Label>
@@ -210,6 +293,45 @@ export default function NewVisit() {
                   <Textarea id="result" value={form.result} onChange={(e) => update("result", e.target.value)} placeholder="Descreva o resultado da visita..." rows={3} />
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label>Fotos</Label>
+                <div className="flex flex-wrap gap-2">
+                  {savedPhotos.map((path) => (
+                    <div key={path} className="relative h-20 w-20 rounded-md border bg-muted overflow-hidden">
+                      {signedUrls[path] && <img src={signedUrls[path]} alt="" className="h-full w-full object-cover" />}
+                      <button
+                        type="button"
+                        aria-label="Remover foto"
+                        className="absolute top-0.5 right-0.5 rounded-full bg-background/80 p-0.5"
+                        onClick={() => setSavedPhotos((p) => p.filter((x) => x !== path))}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {newPhotos.map((photo) => (
+                    <div key={photo.path} className="relative h-20 w-20 rounded-md border overflow-hidden">
+                      <img src={photo.dataUrl} alt="" className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        aria-label="Remover foto"
+                        className="absolute top-0.5 right-0.5 rounded-full bg-background/80 p-0.5"
+                        onClick={() => setNewPhotos((p) => p.filter((x) => x.path !== photo.path))}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddPhoto}
+                    className="h-20 w-20 rounded-md border border-dashed flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground hover:bg-accent"
+                  >
+                    <Camera className="h-5 w-5" /> Adicionar
+                  </button>
+                </div>
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <Button type="submit" disabled={isSubmitting}>
